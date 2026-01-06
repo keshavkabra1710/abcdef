@@ -6,16 +6,15 @@ import requests
 # Page Configuration
 st.set_page_config(page_title="DesignSpark | Universal Doc Converter", page_icon="⚡")
 
+def get_file_size(file_path):
+    """Returns file size in MB."""
+    size_bytes = os.path.getsize(file_path)
+    return size_bytes / (1024 * 1024)
+
 def main():
     st.title("⚡ Universal File-to-Text Converter")
-    st.markdown("Convert Office docs, PDFs, and HTML into clean Markdown for LLMs or documentation.")
+    st.markdown("Convert Office docs and PDFs into clean Markdown. Compare efficiency in the analytics tab.")
 
-    # Initialize MarkItDown with custom request settings for resilience
-    # Note: MarkItDown uses requests internally for URL-based conversions
-    session = requests.Session()
-    session.headers.update({"User-Agent": "DesignSpark-Internal-Tool/1.0"})
-    
-    # markitdown currently handles local files primarily; we wrap the tool logic
     mid = MarkItDown()
 
     # [2] Interface: Upload Area
@@ -31,56 +30,38 @@ def main():
             base_name = os.path.splitext(file_name)[0]
             
             try:
-                # Save uploaded file to a temporary location to process
+                # Save uploaded file to get accurate original size
                 with open(file_name, "wb") as f:
                     f.write(uploaded_file.getbuffer())
+                
+                orig_size = get_file_size(file_name)
 
-                # [1] The Engine: Process file
                 with st.spinner(f"Processing {file_name}..."):
-                    # We set a timeout logic context if it were a URL, 
-                    # for local files markitdown is near-instant.
                     result = mid.convert(file_name)
                     md_content = result.text_content
-
-                # [2] Interface: Instant Preview
-                st.subheader(f"📄 Preview: {file_name}")
-                st.text_area(
-                    label="Converted Content",
-                    value=md_content,
-                    height=300,
-                    key=f"preview_{file_name}"
-                )
-
-                # [2] Interface: Download Options
-                col1, col2 = st.columns(2)
                 
-                with col1:
-                    st.download_button(
-                        label="📥 Download as Markdown (.md)",
-                        data=md_content,
-                        file_name=f"{base_name}_converted.md",
-                        mime="text/markdown",
-                        key=f"md_{file_name}"
+                # Create temporary converted file to calculate size
+                temp_md_name = f"{base_name}_temp.md"
+                with open(temp_md_name, "w", encoding="utf-8") as f:
+                    f.write(md_content)
+                
+                conv_size = get_file_size(temp_md_name)
+                
+                # Calculate percentage reduction
+                reduction = ((orig_size - conv_size) / orig_size) * 100 if orig_size > 0 else 0
+
+                # UI Layout with Tabs
+                st.subheader(f"📄 File: {file_name}")
+                tab1, tab2 = st.tabs(["🔍 Instant Preview", "📊 File Size Comparison"])
+
+                with tab1:
+                    st.text_area(
+                        label="Converted Content",
+                        value=md_content,
+                        height=300,
+                        key=f"preview_{file_name}"
                     )
-                
-                with col2:
-                    st.download_button(
-                        label="📥 Download as Text (.txt)",
-                        data=md_content,
-                        file_name=f"{base_name}_converted.txt",
-                        mime="text/plain",
-                        key=f"txt_{file_name}"
-                    )
-                
-                # Cleanup temp file
-                os.remove(file_name)
-                st.divider()
-
-            except Exception as e:
-                # [3] Resilience: Error Handling
-                st.error(f"⚠️ Could not read {file_name}. Please check the format.")
-                # Log the specific error to console for debugging
-                print(f"Error processing {file_name}: {e}")
-
-if __name__ == "__main__":
-    main()
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.download_button("📥 Download .md", md_content, f"{base_name}_converted.md", "text/markdown", key=f"md_{
