@@ -8,13 +8,16 @@ st.set_page_config(page_title="DesignSpark | Universal Doc Converter", page_icon
 
 def get_file_size(file_path):
     """Returns file size in MB."""
-    size_bytes = os.path.getsize(file_path)
-    return size_bytes / (1024 * 1024)
+    if os.path.exists(file_path):
+        size_bytes = os.path.getsize(file_path)
+        return size_bytes / (1024 * 1024)
+    return 0
 
 def main():
     st.title("⚡ Universal File-to-Text Converter")
     st.markdown("Convert Office docs and PDFs into clean Markdown. Compare efficiency in the analytics tab.")
 
+    # Initialize Engine
     mid = MarkItDown()
 
     # [2] Interface: Upload Area
@@ -64,4 +67,48 @@ def main():
                     
                     col1, col2 = st.columns(2)
                     with col1:
-                        st.download_button("📥 Download .md", md_content, f"{base_name}_converted.md", "text/markdown", key=f"md_{
+                        # FIXED: Ensured f-strings are correctly closed
+                        st.download_button(
+                            label="📥 Download .md", 
+                            data=md_content, 
+                            file_name=f"{base_name}_converted.md", 
+                            mime="text/markdown", 
+                            key=f"md_btn_{file_name}"
+                        )
+                    with col2:
+                        st.download_button(
+                            label="📥 Download .txt", 
+                            data=md_content, 
+                            file_name=f"{base_name}_converted.txt", 
+                            mime="text/plain", 
+                            key=f"txt_btn_{file_name}"
+                        )
+
+                with tab2:
+                    st.write("### Efficiency Analytics")
+                    data = {
+                        "Version": ["Original File", "Converted Text"],
+                        "Size (MB)": [f"{orig_size:.2f} MB", f"{conv_size:.2f} MB"]
+                    }
+                    st.table(data)
+                    
+                    if reduction > 0:
+                        st.success(f"✨ **Efficiency Gain:** Text version is **{reduction:.1f}% smaller** than the original.")
+                    else:
+                        st.info("The converted version is roughly the same size as the original.")
+
+                # Cleanup
+                if os.path.exists(file_name):
+                    os.remove(file_name)
+                if os.path.exists(temp_md_name):
+                    os.remove(temp_md_name)
+                st.divider()
+
+            except Exception as e:
+                st.error(f"⚠️ Could not read {file_name}. Please check the format.")
+                # Ensure local cleanup on error
+                if os.path.exists(file_name): 
+                    os.remove(file_name)
+
+if __name__ == "__main__":
+    main()
